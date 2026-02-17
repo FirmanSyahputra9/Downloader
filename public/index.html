@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>PutraVerse YT Downloader</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #1f1f1f, #34495e);
+            margin: 0;
+            padding: 40px;
+            color: white;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            color: black;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .video-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background: #444;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 20px;
+            background: #27ae60;
+            width: 0%;
+        }
+
+        #videoList {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>🎵 PutraVerse YT Downloader</h2> <input type="text" id="url" style="width:100%;padding:8px;"
+                placeholder="Tempel URL"> <br><br> <button class="primary" id="searchBtn"
+                onclick="getInfo()">Cari</button>
+        </div>
+        <div class="card" id="videoSection" style="display:none;">
+            <h3>Pilih Video</h3> <button class="primary" onclick="selectAll()">Select All</button> <button
+                class="primary" onclick="discardAll()">Discard All</button> <br><br>
+            <div id="videoList"></div> <br> <select id="format">
+                <option value="mp4">MP4</option>
+                <option value="mp3">MP3</option>
+            </select> <select id="resolution">
+                <option value="best">Best</option>
+                <option value="360">360p</option>
+                <option value="720">720p</option>
+                <option value="1080">1080p</option>
+            </select> <br><br> <button class="success" onclick="startDownload()">Download</button>
+        </div>
+        <div class="card" id="progressSection" style="display:none;">
+            <h3>🚀 Download Progress</h3>
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                <img id="currentThumb" src=""
+                    style="width: 120px; border-radius: 8px; display: none; border: 1px solid #ddd;">
+                <div>
+                    <p id="current" style="font-weight: bold; margin: 0;"></p>
+                    <div id="fileInfo" style="font-size: 0.85em; color: #666; margin-top: 5px;">
+                        <span id="videoDuration"></span> | <span id="videoSize"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" id="bar"></div>
+            </div>
+            <p id="percent" style="text-align: right; margin-top: 5px;">0%</p>
+            <p id="queue"></p>
+            <p id="done"></p>
+            <h4>📋 List Antrian</h4>
+            <div id="queueList" style="max-height:200px; overflow-y:auto;"></div>
+        </div>
+        <hr>
+    </div>
+    </div>
+    <script>        let progressInterval = null; function selectAll() { document.querySelectorAll('.videoCheck').forEach(cb => { cb.checked = true; }); } function discardAll() { document.querySelectorAll('.videoCheck').forEach(cb => { cb.checked = false; }); } function startProgressPolling() {
+            if (progressInterval) return; progressInterval = setInterval(async () => {
+                const res = await fetch('/status');
+                const data = await res.json(); document.getElementById('current').innerText = "Sedang: " + data.current; if (data.details) {
+                    document.getElementById('videoDuration').innerText = "🕒 Durasi: " + (data.details.duration || '-');
+                    document.getElementById('videoSize').innerText = "📦 Ukuran Est: " + (data.details.size || '-');
+                    const thumbImg = document.getElementById('currentThumb');
+                    if (data.details.thumbnail) {
+                        thumbImg.src = data.details.thumbnail;
+                        thumbImg.style.display = 'block';
+                    } else {
+                        thumbImg.style.display = 'none';
+                    }
+                } document.getElementById('bar').style.width =
+                    data.progress + "%"; document.getElementById('percent').innerText =
+                        data.progress + "%"; document.getElementById('queue').innerText =
+                            "Antrian: " + (data.total - data.completed); document.getElementById('done').innerText =
+                                "Selesai: " + data.completed + " / " + data.total;
+                // 🔹 Render Queue List
+                const queueList = document.getElementById('queueList');
+                queueList.innerHTML = ''; data.queue.forEach((video, index) => {
+                    queueList.innerHTML += `
+                <div class="video-item">
+                    ${index + 1}. ${video}
+                </div>
+            `;
+                });
+                if (data.completed === data.total && data.total !== 0) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+            }, 1000);
+        } async function getInfo() {
+            const url = document.getElementById('url').value; const btn = document.getElementById('searchBtn'); if (!url) { alert("Masukkan URL dulu"); return; } btn.innerText = "Loading..."; btn.disabled = true; try {
+                const res = await fetch('/get-info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); const data = await res.json(); if (data.error) { alert(data.error); return; } const list = document.getElementById('videoList'); list.innerHTML = ''; data.videos.forEach(v => {
+                    list.innerHTML += `
+        <div class="video-item" style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" value="${v.url}" data-title="${v.title}" data-thumb="${v.thumbnail}" class="videoCheck">
+            <img src="${v.thumbnail}" style="width:80px; border-radius:4px;">
+            <span>${v.title}</span>
+        </div>
+    `;
+                }); document.getElementById('videoSection').style.display = 'block'; window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            } finally { btn.innerText = "Cari"; btn.disabled = false; }
+        } async function startDownload() {
+            document.getElementById('bar').style.width = "0%";
+            document.getElementById('percent').innerText = "0%"; const checks = document.querySelectorAll('.videoCheck:checked');
+            const videos = Array.from(checks).map(c => ({
+                url: c.value,
+                title: c.dataset.title,
+                thumbnail: c.dataset.thumb
+            })); const format = document.getElementById('format').value;
+            const resolution = document.getElementById('resolution').value; if (videos.length === 0) {
+                alert('Pilih minimal 1 video');
+                return;
+            } await fetch('/download-selected', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videos, format, resolution })
+            }); document.getElementById('progressSection').style.display = 'block'; startProgressPolling(); document.getElementById('progressSection')
+                .scrollIntoView({ behavior: 'smooth' });
+        }    </script>
+</body>
+
+</html>
